@@ -250,16 +250,6 @@ BEQ R1, R2, 12    # Se R1 == R2, pula para PC=12 (instrução i_3)
 
 5. **Analise as métricas finais** quando o programa terminar
 
-## 🧪 Validação do Simulador
-
-O simulador foi validado com o programa de exemplo, apresentando os seguintes resultados:
-
-```
-✓ PASS - Ciclos: 18
-✓ PASS - IPC: 0.44
-✓ PASS - Stalls (bolhas): 8
-```
-
 ## 📚 Conceitos Importantes
 
 ### Execução Fora de Ordem

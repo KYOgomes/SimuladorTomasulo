@@ -118,7 +118,7 @@ class TomasuloSim:
             "ADD": 2,
             "SUB": 2,
             "MUL": 4,
-            "DIV": 8,
+            "DIV": 6,
             "LW": 3,
             "SW": 2,
             "BEQ": 1,
@@ -470,18 +470,15 @@ class TomasuloSim:
 
             free_rob_idx = self.find_free_rob_index()
             if free_rob_idx is None:
-                self.total_stalls += 1
                 break
 
             if instr.op in ("LW", "SW"):
                 free_lsb = self.find_free_lsb_index()
                 if free_lsb is None:
-                    self.total_stalls += 1
                     break
             else:
                 free_rs = self.find_free_rs_index()
                 if free_rs is None:
-                    self.total_stalls += 1
                     break
 
             # Preenche ROB
@@ -512,12 +509,21 @@ class TomasuloSim:
             if instr.op == "BEQ":
                 cp_id = self.next_checkpoint_id
                 self.next_checkpoint_id += 1
+                
+                # Se já existe checkpoint ativo, este BEQ é especulativo em relação ao ANTERIOR
+                if self.active_checkpoint_id is not None:
+                    rob_ent.speculative = True
+                    rob_ent.checkpoint_id = self.active_checkpoint_id
+                    instr.speculative = True
+                
+                # Define o NOVO checkpoint ativo (para as PRÓXIMAS instruções)
                 self.active_checkpoint_id = cp_id
                 cp = Checkpoint(cp_id, copy.deepcopy(self.RAT), self.rob_enqueue_seq)
                 self.checkpoints[cp_id] = cp
                 rob_ent.checkpoint_id = cp_id
-                rob_ent.speculative = True
-                instr.speculative = True
+                
+                # BEQ em si NÃO é especulativo do SEU PRÓPRIO checkpoint
+                # (apenas instruções DEPOIS dele serão)
 
                 pred = self.predictor.get(instr.pc, False)
                 pred_str = "Tomado" if pred else "Não tomado"
@@ -537,7 +543,7 @@ class TomasuloSim:
                     rob_ent.speculative = True
                     rob_ent.checkpoint_id = self.active_checkpoint_id
                     instr.speculative = True
-
+                
             # Load/Store
             if instr.op in ("LW", "SW"):
                 l = self.lsb[free_lsb]
@@ -781,9 +787,15 @@ class TomasuloSim:
                 ent.branch_taken = taken
                 ent.ready = True
 
-        self.resolve_branches()
         self.execute_stage()
         issued = self.issue_stage()
+        
+        # Count stalls: cycles where no instruction was issued
+        # Don't count if everything is done (halted state)
+        if issued == 0 and not self.halted:
+            self.total_stalls += 1
+            
+        self.resolve_branches()
 
         if all((not e.busy) for e in self.rob) and all((not r.busy) for r in self.rs) and all(
             (not l.busy) for l in self.lsb
@@ -860,7 +872,7 @@ class TomasuloApp:
         self.prog_text.grid(row=1, column=0, sticky="nsew")
 
         sample = """# Exemplo 1: Completão de programa MIPS
-BEQ R1, R2, 4 
+BEQ R1, R2, 12 
 LW F6, 0(R1) 
 LW F2, 4(R2) 
 MUL F0, F2, F4 

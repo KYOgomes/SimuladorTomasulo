@@ -147,7 +147,10 @@ class TomasuloSim:
 
         # controle
         self.halted = False
-
+        
+        # histórico para funcionalidade "Back"
+        self.state_history: List[dict] = []  # lista de snapshots do estado
+        self.max_history = 100  # máximo de estados salvos
     # --------------------------
     # Parser de programa
     # --------------------------
@@ -760,6 +763,9 @@ class TomasuloSim:
     def step(self):
         if self.halted:
             return {}
+        
+        # Salva o estado atual antes de executar o próximo ciclo
+        self.save_state()
 
         self.step_logs = []
 
@@ -811,6 +817,84 @@ class TomasuloSim:
             "committed_total": self.committed_count,
             "branch_logs": self.step_logs,
         }
+
+    def save_state(self):
+        """Salva um snapshot do estado atual do simulador no histórico."""
+        state_snapshot = {
+            'program': copy.deepcopy(self.program),
+            'pc': self.pc,
+            'memory': copy.deepcopy(self.memory),
+            'register_file': copy.deepcopy(self.register_file),
+            'RAT': copy.deepcopy(self.RAT),
+            'rob': copy.deepcopy(self.rob),
+            'rob_enqueue_seq': self.rob_enqueue_seq,
+            'rs': copy.deepcopy(self.rs),
+            'lsb': copy.deepcopy(self.lsb),
+            'cycle': self.cycle,
+            'predictor': copy.deepcopy(self.predictor),
+            'checkpoints': copy.deepcopy(self.checkpoints),
+            'next_checkpoint_id': self.next_checkpoint_id,
+            'active_checkpoint_id': self.active_checkpoint_id,
+            'committed_count': self.committed_count,
+            'total_stalls': self.total_stalls,
+            'branch_mispredictions': self.branch_mispredictions,
+            'total_fetch': self.total_fetch,
+            'cumulative_rs_occupancy': self.cumulative_rs_occupancy,
+            'cumulative_rob_occupancy': self.cumulative_rob_occupancy,
+            'cumulative_lsb_occupancy': self.cumulative_lsb_occupancy,
+            'halted': self.halted,
+        }
+        
+        self.state_history.append(state_snapshot)
+        
+        # Limita o tamanho do histórico
+        if len(self.state_history) > self.max_history:
+            self.state_history.pop(0)
+    
+    def restore_state(self) -> bool:
+        """Restaura o estado anterior do simulador. Retorna True se sucesso."""
+        if not self.state_history:
+            return False
+        
+        # Remove o estado atual (último na lista)
+        if len(self.state_history) > 0:
+            self.state_history.pop()
+        
+        # Restaura o estado anterior
+        if len(self.state_history) > 0:
+            state = self.state_history[-1]
+            
+            self.program = copy.deepcopy(state['program'])
+            self.pc = state['pc']
+            self.memory = copy.deepcopy(state['memory'])
+            self.register_file = copy.deepcopy(state['register_file'])
+            self.RAT = copy.deepcopy(state['RAT'])
+            self.rob = copy.deepcopy(state['rob'])
+            self.rob_enqueue_seq = state['rob_enqueue_seq']
+            self.rs = copy.deepcopy(state['rs'])
+            self.lsb = copy.deepcopy(state['lsb'])
+            self.cycle = state['cycle']
+            self.predictor = copy.deepcopy(state['predictor'])
+            self.checkpoints = copy.deepcopy(state['checkpoints'])
+            self.next_checkpoint_id = state['next_checkpoint_id']
+            self.active_checkpoint_id = state['active_checkpoint_id']
+            self.committed_count = state['committed_count']
+            self.total_stalls = state['total_stalls']
+            self.branch_mispredictions = state['branch_mispredictions']
+            self.total_fetch = state['total_fetch']
+            self.cumulative_rs_occupancy = state['cumulative_rs_occupancy']
+            self.cumulative_rob_occupancy = state['cumulative_rob_occupancy']
+            self.cumulative_lsb_occupancy = state['cumulative_lsb_occupancy']
+            self.halted = state['halted']
+            self.step_logs = []
+            
+            return True
+        
+        return False
+    
+    def can_go_back(self) -> bool:
+        """Verifica se é possível voltar um ciclo."""
+        return len(self.state_history) > 1
 
     def reset(self):
         self.__init__()
@@ -890,9 +974,10 @@ BEQ R1, R0, 0
 
         ttk.Button(ctrl_frame, text="Carregar programa", command=self.load_program).grid(row=0, column=0)
         ttk.Button(ctrl_frame, text="Step (1 ciclo)", command=self.step).grid(row=0, column=1)
+        ttk.Button(ctrl_frame, text="Back (1 ciclo)", command=self.back).grid(row=0, column=2)
         self.run_btn = ttk.Button(ctrl_frame, text="Run", command=self.toggle_run)
-        self.run_btn.grid(row=0, column=2)
-        ttk.Button(ctrl_frame, text="Reset", command=self.reset).grid(row=0, column=3)
+        self.run_btn.grid(row=0, column=3)
+        ttk.Button(ctrl_frame, text="Reset", command=self.reset).grid(row=0, column=4)
 
         right = ttk.Frame(top)
         right.grid(row=0, column=1, sticky="nsew")
@@ -1075,17 +1160,38 @@ BEQ R1, R0, 0
                 ),
             )
 
-        # Registradores
+        # Registradores - mostra apenas os que são destinos no programa
         self.reg_text.delete("1.0", "end")
-        regs_lines = []
-        for i in range(0, self.sim.register_count, 8):
-            chunk = []
-            for j in range(i, i + 8):
-                reg_name = f"R{j}"
-                label = self.sim.get_register_writer_label(reg_name)
-                chunk.append(f"{reg_name}: {label}")
-            regs_lines.append(" | ".join(chunk))
-        self.reg_text.insert("1.0", "\n".join(regs_lines))
+        
+        # Identifica quais registradores são usados como destino
+        used_regs = set()
+        for ins in self.sim.program:
+            if ins.op in ("ADD", "SUB", "MUL", "DIV"):
+                if ins.rd:
+                    used_regs.add(ins.rd)
+            elif ins.op == "LW":
+                if ins.rt:
+                    used_regs.add(ins.rt)
+        
+        # Ordena os registradores (R0, R1, R2, ... F0, F1, ...)
+        sorted_regs = sorted(used_regs, key=lambda r: (r[0], int(r[1:])))
+        
+        # Exibe apenas os registradores usados
+        if sorted_regs:
+            regs_display = []
+            for reg in sorted_regs:
+                label = self.sim.get_register_writer_label(reg)
+                regs_display.append(f"{reg}: {label}")
+            
+            # Agrupa em linhas de até 8 registradores
+            regs_lines = []
+            for i in range(0, len(regs_display), 8):
+                chunk = regs_display[i:i+8]
+                regs_lines.append(" | ".join(chunk))
+            
+            self.reg_text.insert("1.0", "\n".join(regs_lines))
+        else:
+            self.reg_text.insert("1.0", "Nenhum registrador de destino usado")
 
         # Métricas
         cycles = self.sim.cycle
@@ -1122,6 +1228,22 @@ BEQ R1, R0, 0
             self.log("Simulação finalizada")
             self.running = False
             self.run_btn.config(text="Run")
+
+    def back(self):
+        """Volta um ciclo no simulador."""
+        if not self.sim.program:
+            self.log("Nenhum programa carregado.")
+            return
+        
+        if not self.sim.can_go_back():
+            self.log("Não é possível voltar (início da simulação).")
+            return
+        
+        if self.sim.restore_state():
+            self.log(f"Voltou para o ciclo {self.sim.cycle}")
+            self.update_views()
+        else:
+            self.log("Erro ao voltar ciclo.")
 
     def run_loop(self):
         if not self.running:

@@ -859,17 +859,17 @@ class TomasuloApp:
         self.prog_text = scrolledtext.ScrolledText(left, width=40, height=20)
         self.prog_text.grid(row=1, column=0, sticky="nsew")
 
-        sample = """# Exemplo 1: dependência simples
-ADD R1, R2, R3
-ADD R4, R1, R5
-MUL R6, R7, R8
-# Exemplo 2: load/store
-SW R2, 0(R3)
-LW R1, 0(R3)
-# Exemplo 3: branch
-ADD R1, R0, R0
-BEQ R1, R0, 28
-ADD R2, R3, R4
+        sample = """# Exemplo 1: Completão de programa MIPS
+BEQ R1, R2, 4 
+LW F6, 0(R1) 
+LW F2, 4(R2) 
+MUL F0, F2, F4 
+SUB F8, F6, F0 
+DIV F10, F8, F2 
+ADD F4, F10, F6 
+SW F4, 8(R3) 
+ADD R1, R1, R1 
+BEQ R1, R0, 0
 """
         self.prog_text.insert("1.0", sample)
 

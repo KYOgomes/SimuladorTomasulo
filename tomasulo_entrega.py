@@ -21,12 +21,12 @@ import copy
 class Instruction:
     pc: int
     text: str
-    idx: int = 0           # índice da instrução (1,2,3...) na ordem do programa
+    idx: int = 0           # índice da instrução 
     op: str = ""
     rd: Optional[str] = None
     rs: Optional[str] = None
     rt: Optional[str] = None
-    imm: Optional[int] = None  # immediate ou alvo (dependendo de BEQ)
+    imm: Optional[int] = None  
     state: str = "NotFetched"
     rob_id: Optional[int] = None
     rs_id: Optional[int] = None
@@ -53,7 +53,7 @@ class ROBEntry:
     type: Optional[str] = None  # REG, STORE, BRANCH
     branch_taken: Optional[bool] = None
     checkpoint_id: Optional[int] = None
-    enqueue_seq: Optional[int] = None  # para ordenação FIFO lógica
+    enqueue_seq: Optional[int] = None  
 
 @dataclass
 class ReservationStation:
@@ -131,7 +131,7 @@ class TomasuloSim:
         # checkpoints para especulação
         self.checkpoints: Dict[int, Checkpoint] = {}
         self.next_checkpoint_id = 1
-        self.active_checkpoint_id: Optional[int] = None  # um branch especulativo ativo
+        self.active_checkpoint_id: Optional[int] = None  
 
         # métricas
         self.committed_count = 0
@@ -142,15 +142,15 @@ class TomasuloSim:
         self.cumulative_rob_occupancy = 0
         self.cumulative_lsb_occupancy = 0
 
-        # logs do ciclo (predições, resoluções, etc.)
+        
         self.step_logs: List[str] = []
 
-        # controle
+        
         self.halted = False
         
-        # histórico para funcionalidade "Back"
-        self.state_history: List[dict] = []  # lista de snapshots do estado
-        self.max_history = 100  # máximo de estados salvos
+
+        self.state_history: List[dict] = []  
+        self.max_history = 100  
     # --------------------------
     # Parser de programa
     # --------------------------
@@ -199,7 +199,7 @@ class TomasuloSim:
             pc += 4
             idx_counter += 1
 
-        # reset dinâmico
+        
         self.pc = 0
         self.total_fetch = 0
         self.halted = False
@@ -1183,7 +1183,7 @@ BEQ R1, R0, 0
                 label = self.sim.get_register_writer_label(reg)
                 regs_display.append(f"{reg}: {label}")
             
-            # Agrupa em linhas de até 8 registradores
+            
             regs_lines = []
             for i in range(0, len(regs_display), 8):
                 chunk = regs_display[i:i+8]

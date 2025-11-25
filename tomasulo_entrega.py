@@ -972,12 +972,12 @@ BEQ R1, R0, 0
         ctrl_frame = ttk.Frame(left)
         ctrl_frame.grid(row=2, column=0, sticky="we", pady=6)
 
-        ttk.Button(ctrl_frame, text="Carregar programa", command=self.load_program).grid(row=0, column=0)
-        ttk.Button(ctrl_frame, text="Step (1 ciclo)", command=self.step).grid(row=0, column=1)
-        ttk.Button(ctrl_frame, text="Back (1 ciclo)", command=self.back).grid(row=0, column=2)
+        ttk.Button(ctrl_frame, text="Carregar programa", command=self.load_program).grid(row=0, column=0, sticky="we", pady=2)
+        ttk.Button(ctrl_frame, text="Step (1 ciclo)", command=self.step).grid(row=1, column=0, sticky="we", pady=2)
+        ttk.Button(ctrl_frame, text="Back (1 ciclo)", command=self.back).grid(row=2, column=0, sticky="we", pady=2)
         self.run_btn = ttk.Button(ctrl_frame, text="Run", command=self.toggle_run)
-        self.run_btn.grid(row=0, column=3)
-        ttk.Button(ctrl_frame, text="Reset", command=self.reset).grid(row=0, column=4)
+        self.run_btn.grid(row=3, column=0, sticky="we", pady=2)
+        ttk.Button(ctrl_frame, text="Reset", command=self.reset).grid(row=4, column=0, sticky="we", pady=2)
 
         right = ttk.Frame(top)
         right.grid(row=0, column=1, sticky="nsew")

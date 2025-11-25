@@ -965,7 +965,7 @@ DIV F10, F8, F2
 ADD F4, F10, F6 
 SW F4, 8(R3) 
 ADD R1, R1, R1 
-BEQ R1, R0, 0
+ADD R1, R5, R4
 """
         self.prog_text.insert("1.0", sample)
 
@@ -997,6 +997,7 @@ BEQ R1, R0, 0
             self.instr_table.heading(c, text=title)
         self.instr_table.column("pc", width=70, anchor="center")
         self.instr_table.column("idx", width=40, anchor="center")
+        self.instr_table.column("text", width=200, anchor="center")
         self.instr_table.column("stage", width=80, anchor="center")
         self.instr_table.column("state", width=80, anchor="center")
         self.instr_table.column("rob", width=50, anchor="center")
@@ -1019,6 +1020,8 @@ BEQ R1, R0, 0
         )
         for c in ("id", "busy", "type", "dest", "ready", "spec", "instr"):
             self.rob_table.heading(c, text=c.upper())
+        for c in ("id", "busy", "type", "dest", "ready", "spec", "instr"):
+            self.rob_table.column(c, anchor="center")
         self.rob_table.grid(row=4, column=0, sticky="nsew")
 
         ttk.Label(right, text="RS").grid(row=5, column=0, sticky="w", pady=(6, 0))
@@ -1030,6 +1033,8 @@ BEQ R1, R0, 0
         )
         for c in ("id", "busy", "op", "Vj", "Vk", "Qj", "Qk", "rob"):
             self.rs_table.heading(c, text=c.upper())
+        for c in ("id", "busy", "op", "Vj", "Vk", "Qj", "Qk", "rob"):
+            self.rs_table.column(c, anchor="center")
         self.rs_table.grid(row=6, column=0, sticky="nsew")
 
         ttk.Label(right, text="LSB").grid(row=7, column=0, sticky="w", pady=(6, 0))
@@ -1041,6 +1046,8 @@ BEQ R1, R0, 0
         )
         for c in ("id", "busy", "op", "addr", "Vt", "Qt", "rob"):
             self.lsb_table.heading(c, text=c.upper())
+        for c in ("id", "busy", "op", "addr", "Vt", "Qt", "rob"):
+            self.lsb_table.column(c, anchor="center")
         self.lsb_table.grid(row=8, column=0, sticky="nsew")
 
         bottom = ttk.Frame(self.root, padding=6)

@@ -2,8 +2,7 @@
 # Simulador didático do algoritmo de Tomasulo (MVP funcional)
 # - Suporta: ADD, SUB, MUL, DIV, LW, SW, BEQ
 # - Estruturas: ROB, RS, LSB, RAT, checkpoints para especulação 1-bit
-# - Interface: Tkinter (Load program, Step, Run, Reset)
-# - Visualização de pipeline por instrução: IF / ID / EX / MEM / WB / COMMIT / FLUSSHED
+# - Visualização de pipeline por instrução: IF / ID / EX / MEM / WB / COMMIT / FLUSHED
 # - Registradores mostram a ÚLTIMA INSTRUÇÃO que ESCREVE neles APÓS WB: ex. R1: ADD_03
 # - Log mostra predição/resolução de desvio com PC em forma i_0, i_1, ...
 # Requisitos: Python 3.8+ (Tkinter incluído)
@@ -87,9 +86,7 @@ class Checkpoint:
     RAT: Dict[str, Optional[int]]
     enqueue_seq_snapshot: int
 
-# --------------------------
-# Núcleo do simulador
-# --------------------------
+
 class TomasuloSim:
     def __init__(self):
         # configuração fixa
@@ -937,7 +934,7 @@ class TomasuloApp:
             return "IF"
 
         if ins.state == "Flushed":
-            return "FLUSSHED"
+            return "FLUSHED"
 
         return ""
 
@@ -1009,7 +1006,7 @@ ADD R1, R5, R4
         self.instr_table.tag_configure("MEM", background="#f3e5f5")
         self.instr_table.tag_configure("WB", background="#ffebee")
         self.instr_table.tag_configure("COMMIT", background="#e0f7fa")
-        self.instr_table.tag_configure("FLUSSHED", background="#eeeeee")
+        self.instr_table.tag_configure("FLUSHED", background="#eeeeee")
 
         ttk.Label(right, text="ROB").grid(row=3, column=0, sticky="w", pady=(6, 0))
         self.rob_table = ttk.Treeview(

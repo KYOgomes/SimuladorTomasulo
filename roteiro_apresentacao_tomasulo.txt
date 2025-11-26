@@ -1,0 +1,129 @@
+
+Este é o nosso programa de MIPS que vamos usar
+
+i_0: BEQ R1, R2, 12
+i_1: LW  F6, 0(R1)
+i_2: LW  F2, 4(R2)
+i_3: MUL F0, F2, F4
+i_4: SUB F8, F6, F0
+i_5: DIV F10, F8, F2
+i_6: ADD F4, F10, F6
+i_7: SW  F4, 8(R3)
+i_8: ADD R1, R1, R1
+
+“Esse programa tem:
+– Um BEQ pra testar predição e flush,
+– Dois loads e um store pra usar o LSB,
+– MUL, SUB, DIV, ADD com latências diferentes pra mostrar execução fora de ordem.
+
+
+
+Começando no primeiro step, temos o BEQ – predição e instruções especulativas
+
+“O BEQ R1, R2, 12 (i_0) entra no ROB e numa RS.
+Como é branch, o simulador cria um checkpoint do RAT.
+O preditor de 1 bit, sem histórico, chuta ‘não tomado’.
+Por isso o simulador segue pra i_1 e i_2, e os dois LW tendem a entrar como especulativos no ROB e no LSB.
+
+Resumindo tudo que vem depois dele é marcado como especulativo até o branch ser resolvido.”
+
+5. Mispredict e flush dos dois LW
+
+“Quando o BEQ termina e vai para WB, ele compara R1 com R2. Como os dois são 0, então o desvio na verdade é tomado.
+A predição que era ‘não tomado’ será alterada → portanto deu misprediction.
+
+O que acontece aqui, por causa disso:
+– Todas as entradas especulativas do ROB são limpas;
+– Os dois LW i_1 e i_2 mudam o estado pra Flushed;
+– O LSB libera as posições deles;
+– O RAT é restaurado do checkpoint;
+– O PC é corrigido para a próxima instrução, i_3.
+
+ aqui dá pra ver o papel do ROB e do checkpoint pra desfazer a especulação.
+
+6. Latências e ordem de término / WB
+
+“Aqui vale destacar as latências que a gente configurou no simulador para cada tipo de instrução:
+
+– ADD / SUB → 2 ciclos de execução
+– MUL        → 4 ciclos
+– DIV        → 6 ciclos
+– LW         → 3 ciclos
+– SW         → 2 ciclos
+– BEQ        → 1 ciclo
+
+Isso significa que a ordem em que as instruções terminam e fazem WB **não precisa seguir** a ordem original do código.
+O que manda é: latência da operação + momento em que os operandos ficam prontos.
+
+Por exemplo:
+– Uma instrução com latência 2 (como um SUB) pode terminar e fazer WB antes de outra instrução com latência 4 (como uma MUL) ou 6 (como uma DIV), mesmo que essa outra tenha sido emitida antes, se ela não tiver dependências críticas ou se pegar a unidade funcional em um momento mais livre.
+
+É por isso que, olhando o timeline do simulador, você pode ver um SUB fazendo WB ‘na frente’ de outra instrução que veio antes no código, e a DIV aparecendo bem depois, porque ela simplesmente leva mais ciclos para executar.
+Essa diferença de latência é justamente o que evidencia a execução fora de ordem: o término/WB obedece o tempo de execução e as dependências, não a ordem do código-fonte.”
+
+7. Fluxo principal – MUL, SUB, DIV, ADD, SW (RS e execução fora de ordem)
+
+“Depois do flush, a execução continua a partir da MUL F0, F2, F4 (i_3).
+A partir daqui, cada instrução que entra:
+– ganha uma entrada no ROB,
+– ocupa uma RS (ou o LSB, no caso de load/store),
+– e tem seu destino mapeado na RAT.
+
+Na RS dá pra ver as dependências entre as instruções:
+– A SUB F8, F6, F0 (i_4) depende do resultado da MUL,
+– A DIV F10, F8, F2 (i_5) depende da SUB,
+– E a ADD F4, F10, F6 (i_6) depende da DIV.
+
+Quando a MUL termina (latência 4), ela escreve o resultado no ROB e manda esse valor no barramento comum.
+Por causa disso:
+– As estações de reserva que estavam esperando a MUL recebem o valor automaticamente,
+– A SUB passa a ter todos os operandos prontos e pode começar a executar (latência 2).
+Depois, o mesmo acontece em cadeia com a DIV (latência 6) e com a ADD.
+
+O ponto importante aqui é:
+– quem termina primeiro é quem tem latência menor e operandos prontos,
+– não necessariamente quem veio primeiro no código.
+A execução é fora de ordem nas unidades funcionais, mas o commit ainda respeita a ordem das entradas no ROB.
+Então a parte de baixo é “fora de ordem” e a parte de cima é “em ordem”, exatamente a ideia do Tomasulo.”
+
+8. Store no LSB
+
+“Quando chega o SW F4, 8(R3) (i_7), ele entra no LSB e no ROB como uma instrução do tipo STORE.
+Ele faz duas coisas:
+– calcula o endereço com R3 + deslocamento,
+– e fica esperando o valor de F4, que vem da ADD F4, F10, F6.
+
+No LSB a gente enxerga isso assim:
+– às vezes o endereço já está pronto,
+– mas o valor ainda está ‘pendurado’ em um ROB (Qt) esperando o resultado chegar pelo barramento.
+Quando o valor de F4 chega, o store fica pronto.
+
+Mesmo assim, ele só escreve na memória de verdade na fase de commit, quando a entrada dele é a próxima do ROB.
+Isso garante que, se acontecesse um novo flush ou algum problema antes, a memória não seria alterada de forma errada.”
+
+9. ADD's em R1
+
+Quando dá write-back, o simulador registra lá embaixo R1: ADD_01 (ou _02 se tiver mais ADDs), mostrando que esse foi o último writer de R1 E tambem substitui a ultima isntrução salva caso venha outra..
+
+Depois que todas as instruções do programa ou estão Committed ou Flushed, e não resta mais nada no ROB nem nas RS/LSB, o simulador detecta que a execução terminou e mostra ‘Simulação finalizada’ nos logs.”
+
+10. Métricas finais
+
+“No final, o simulador mostra as métricas:
+– Ciclos totais de execução do programa
+– Quantas instruções realmente foram commitadas (as LW especulativas não contam)
+– IPC (Instruções por Ciclo), que fica abaixo de 1 justamente por causa das latências e dos stalls
+– Stalls (bolhas): ciclos em que nenhuma instrução nova foi emitida
+– Número de mispredictions: aqui pelo menos 1, vindo do BEQ inicial que foi predito como ‘não tomado’ mas era tomado
+
+Essas métricas fecham com o comportamento do programa: dependências em cadeia (MUL → SUB → DIV → ADD), um flush de branch logo no começo e algumas bolhas por falta de recurso / dependência de dado.”
+
+11. Fechamento
+
+“Então, resumindo:
+– O simulador mostra execução fora de ordem usando RS,
+– Garante commit em ordem pelo ROB,
+– Usa checkpoints e flush pra tratar misprediction do BEQ inicial,
+– E no final a gente consegue ver o impacto disso tudo no IPC, nos stalls e nos branches.
+
+Se quiser, posso voltar em qualquer ponto da execução e mostrar o que tá acontecendo no ROB ou nas RS naquele ciclo específico.”
